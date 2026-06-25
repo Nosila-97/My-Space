@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Gym Log">
+<meta name="theme-color" content="#f5f3ef">
+<title>&#x1F3CB; Alison's Gym Log</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+:root{--bg:#f5f3ef;--card:#fff;--text:#2d2d2d;--sub:#8a8a8a;--accent:#5a7d6a;--accent-light:#e8f0eb;
+  --cardio:#4a90b8;--weights:#c0705b;--other:#9b7fb8;--border:#e8e4df;--shadow:0 2px 8px rgba(0,0,0,.06)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro','PingFang SC',sans-serif;
+  background:var(--bg);color:var(--text);max-width:430px;margin:0 auto;min-height:100vh;
+  padding-bottom:calc(80px + env(safe-area-inset-bottom,0px));
+  padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);
+  overflow-x:hidden}
+.header{padding:calc(20px + env(safe-area-inset-top,0px)) 20px 12px;display:flex;justify-content:space-between;align-items:center}
+.header h1{font-size:22px;font-weight:800}
+.date-nav{display:flex;align-items:center;gap:8px}
+.date-nav button{background:none;border:none;font-size:20px;cursor:pointer;padding:4px;color:var(--sub)}
+.date-nav span{font-size:14px;font-weight:600;min-width:100px;text-align:center}
+/* Stats */
+.stats-bar{display:flex;gap:10px;padding:0 20px;margin-top:20px;margin-bottom:8px}
+.stat-card{flex:1;background:var(--card);border-radius:12px;padding:10px 6px;text-align:center;
+  box-shadow:var(--shadow);border:1px solid var(--border);min-width:0}
+.stat-card .num{font-size:20px;font-weight:800}
+.stat-card .lbl{font-size:10px;color:var(--sub);font-weight:600;margin-top:2px}
+/* Weight input */
+.weight-section{padding:0 20px;margin-top:16px}
+.weight-box{background:var(--card);border-radius:14px;padding:16px;box-shadow:var(--shadow);border:1px solid var(--border)}
+.weight-row{display:flex;align-items:center;gap:10px}
+.weight-row label{font-size:12px;font-weight:700;color:var(--sub);white-space:nowrap}
+.weight-row input{flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--border);
+  font-size:16px;font-weight:600;background:#fafaf8;-webkit-appearance:none;text-align:center;min-width:0}
+.weight-row input:focus{outline:none;border-color:var(--accent)}
+.weight-row .unit{font-size:14px;font-weight:600;color:var(--sub)}
+.btn-chart{width:100%;margin-top:10px;background:var(--accent);color:#fff;border:none;border-radius:10px;
+  padding:10px;font-size:14px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.btn-chart:active{transform:scale(.97)}
+/* Chart */
+.chart-container{padding:0 20px;margin-top:12px;display:none}
+.chart-card{background:var(--card);border-radius:14px;padding:16px;box-shadow:var(--shadow);border:1px solid var(--border)}
+.chart-card canvas{width:100%!important;max-height:220px}
+/* Tabs */
+.tabs{display:flex;gap:8px;padding:0 20px;margin:16px 0}
+.tab{flex:1;padding:10px 0;border-radius:12px;border:2px solid var(--border);background:var(--card);
+  text-align:center;font-size:13px;font-weight:700;cursor:pointer;transition:.2s;-webkit-tap-highlight-color:transparent}
+.tab.active{color:#fff;border-color:transparent}
+.tab[data-t="cardio"].active{background:var(--cardio)}
+.tab[data-t="weights"].active{background:var(--weights)}
+.tab[data-t="other"].active{background:var(--other)}
+.panel{padding:0 20px;display:none}.panel.active{display:block}
+.activity-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.act-btn{padding:14px 10px;border-radius:14px;border:2px solid var(--border);background:var(--card);
+  text-align:center;cursor:pointer;transition:.2s;font-size:13px;font-weight:600;min-height:70px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
+.act-btn:active{transform:scale(.96)}
+.act-btn .emoji{font-size:28px;display:block;margin-bottom:4px}
+.act-btn.sel{border-color:var(--accent);background:var(--accent-light)}
+.input-group{background:var(--card);border-radius:14px;padding:16px;margin-bottom:12px;
+  box-shadow:var(--shadow);border:1px solid var(--border)}
+.input-group label{font-size:12px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px}
+.input-row{display:flex;gap:10px;margin-top:8px}
+.input-row input{flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--border);
+  font-size:16px;font-weight:600;background:#fafaf8;-webkit-appearance:none;min-width:0}
+.input-row input:focus{outline:none;border-color:var(--accent)}
+.btn-save{width:100%;padding:14px;border-radius:14px;border:none;font-size:16px;font-weight:700;
+  color:#fff;cursor:pointer;transition:.2s;-webkit-tap-highlight-color:transparent}
+.btn-save:active{transform:scale(.97)}
+.btn-save.cardio{background:var(--cardio)}.btn-save.weights{background:var(--weights)}.btn-save.other{background:var(--other)}
+/* Daily notes */
+.daily-notes{padding:0 20px;margin-top:16px}
+.notes-box{background:var(--card);border-radius:14px;padding:16px;box-shadow:var(--shadow);border:1px solid var(--border)}
+.notes-box label{font-size:12px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px}
+.notes-box textarea{width:100%;margin-top:8px;padding:10px;border-radius:10px;border:1.5px solid var(--border);
+  font-size:16px;font-family:inherit;background:#fafaf8;resize:vertical;min-height:60px;-webkit-appearance:none}
+.notes-box textarea:focus{outline:none;border-color:var(--accent)}
+/* Calories summary */
+.daily-kcal{background:var(--card);border-radius:14px;padding:14px 16px;margin:16px 20px 4px;
+  box-shadow:var(--shadow);border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.daily-kcal .kcal-num{font-size:24px;font-weight:800;color:#e67e22}
+.daily-kcal .kcal-lbl{font-size:13px;font-weight:600;color:var(--sub)}
+.log-kcal{display:inline-block;background:#fff3e0;color:#e67e22;font-size:11px;font-weight:700;
+  padding:2px 8px;border-radius:8px;margin-left:6px}
+/* Today's log */
+.log-section{padding:0 20px;margin-top:20px}
+.log-section h2{font-size:15px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.log-card{background:var(--card);border-radius:14px;padding:14px 16px;margin-bottom:10px;
+  box-shadow:var(--shadow);border:1px solid var(--border);position:relative}
+.log-card .type-badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;
+  font-weight:700;color:#fff;margin-bottom:8px}
+.log-card .type-badge.cardio{background:var(--cardio)}
+.log-card .type-badge.weights{background:var(--weights)}
+.log-card .type-badge.other{background:var(--other)}
+.log-card .detail{font-size:14px;font-weight:600;line-height:1.6}
+.log-card .meta{font-size:12px;color:var(--sub);margin-top:4px}
+.log-card .del-log{position:absolute;top:12px;right:14px;color:#ccc;cursor:pointer;font-size:16px}
+.log-card .del-log:active{color:#e55}
+.empty-state{text-align:center;padding:40px 20px;color:var(--sub);font-size:14px}
+.empty-state .big{font-size:48px;margin-bottom:8px}
+/* Calendar */
+.cal-section{padding:0 20px;margin-top:24px}
+.cal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.cal-header h2{font-size:15px;font-weight:700}
+.cal-header button{background:none;border:none;font-size:18px;cursor:pointer;color:var(--sub)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center;margin-bottom:6px}
+.cal-day-name{font-size:11px;color:var(--sub);font-weight:600;padding:4px 0}
+.cal-day{padding:3px 1px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;
+  min-height:58px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start}
+.cal-day .day-num{margin-top:2px;line-height:1}
+.cal-day:active{background:var(--accent-light)}
+.cal-day.today{background:var(--accent);color:#fff}
+.cal-day.today .cal-item{color:rgba(255,255,255,.85)}
+.cal-day.today .cal-dot{opacity:.9}
+.cal-day.selected{outline:2px solid var(--accent);outline-offset:-2px}
+.cal-day.other-month{color:#ccc}
+.cal-items{display:flex;flex-direction:column;gap:1px;margin-top:2px;width:100%;overflow:hidden}
+.cal-item{display:flex;align-items:center;gap:2px;font-size:8px;font-weight:600;color:var(--text);
+  line-height:1.1;padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;justify-content:center}
+.cal-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.cal-dot.d-cardio{background:var(--cardio)}
+.cal-dot.d-weights{background:var(--weights)}
+.cal-dot.d-other{background:var(--other)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>&#x1F3CB;&#xFE0F; Gym Log</h1>
+  <div class="date-nav">
+    <button onclick="changeDate(-1)">&lsaquo;</button>
+    <span id="dateLabel"></span>
+    <button onclick="changeDate(1)">&rsaquo;</button>
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="stats-bar">
+  <div class="stat-card"><div class="num" id="sStreak">0</div><div class="lbl">&#x1F525; 连续天数</div></div>
+  <div class="stat-card"><div class="num" id="sMonth">0</div><div class="lbl">&#x1F4C5; 本月次数</div></div>
+  <div class="stat-card"><div class="num" id="sTotal">0</div><div class="lbl">&#x2B50; 总次数</div></div>
+</div>
+
+<!-- Daily Weight -->
+<div class="weight-section">
+  <div class="weight-box">
+    <div class="weight-row">
+      <label>&#x2696;&#xFE0F; 体重</label>
+      <input type="number" id="dailyWeight" placeholder="--" inputmode="decimal" step="0.1" onchange="saveWeight()">
+      <span class="unit">kg</span>
+    </div>
+    <button class="btn-chart" onclick="toggleChart()">&#x1F4C8; 体重趋势</button>
+  </div>
+</div>
+
+<!-- Weight Trend Chart -->
+<div class="chart-container" id="chartContainer">
+  <div class="chart-card">
+    <canvas id="weightChart"></canvas>
+  </div>
+</div>
+
+<!-- Category Tabs -->
+<div class="tabs">
+  <div class="tab" data-t="cardio" onclick="switchTab('cardio')">&#x1F3C3; 有氧</div>
+  <div class="tab" data-t="weights" onclick="switchTab('weights')">&#x1F4AA; 重训</div>
+  <div class="tab" data-t="other" onclick="switchTab('other')">&#x1F3AF; 其他</div>
+</div>
+
+<!-- Cardio Panel -->
+<div class="panel" id="p-cardio">
+  <div class="activity-grid">
+    <div class="act-btn" onclick="selAct(this,'stair')" data-a="stair"><span class="emoji">&#x1FA9C;</span>爬楼机</div>
+    <div class="act-btn" onclick="selAct(this,'elliptical')" data-a="elliptical"><span class="emoji">&#x2B55;</span>椭圆机</div>
+    <div class="act-btn" onclick="selAct(this,'swim')" data-a="swim"><span class="emoji">&#x1F3CA;</span>游泳</div>
+    <div class="act-btn" onclick="selAct(this,'incline')" data-a="incline"><span class="emoji">&#x1F6B6;</span>爬坡走</div>
+    <div class="act-btn" onclick="selAct(this,'dance')" data-a="dance"><span class="emoji">&#x1F483;</span>跳舞</div>
+  </div>
+  <div class="input-group">
+    <label>时长 &amp; 卡路里</label>
+    <div class="input-row">
+      <input type="number" id="cardioDur" placeholder="分钟" inputmode="numeric">
+      <input type="number" id="cardioCal" placeholder="kcal" inputmode="numeric">
+    </div>
+  </div>
+  <div class="input-group">
+    <label>备注</label>
+    <div class="input-row"><input type="text" id="cardioNote" placeholder="备注（选填）"></div>
+  </div>
+  <button class="btn-save cardio" onclick="saveEntry('cardio')">&#x2705; 记录有氧</button>
+</div>
+
+<!-- Weights Panel (simplified) -->
+<div class="panel" id="p-weights">
+  <div class="activity-grid" style="grid-template-columns:1fr 1fr 1fr">
+    <div class="act-btn" onclick="selAct(this,'shoulders')" data-a="shoulders"><span class="emoji">&#x1F4AA;</span>肩</div>
+    <div class="act-btn" onclick="selAct(this,'glutes')" data-a="glutes"><span class="emoji">&#x1F9B5;</span>臀</div>
+    <div class="act-btn" onclick="selAct(this,'back')" data-a="back"><span class="emoji">&#x1F9CB;</span>背</div>
+  </div>
+  <div class="input-group">
+    <label>时长 &amp; 卡路里</label>
+    <div class="input-row">
+      <input type="number" id="weightsDur" placeholder="分钟" inputmode="numeric">
+      <input type="number" id="weightsCal" placeholder="kcal" inputmode="numeric">
+    </div>
+  </div>
+  <div class="input-group">
+    <label>备注</label>
+    <div class="input-row"><input type="text" id="weightsNote" placeholder="备注（选填）"></div>
+  </div>
+  <button class="btn-save weights" onclick="saveEntry('weights')">&#x2705; 记录重训</button>
+</div>
+
+<!-- Other Panel -->
+<div class="panel" id="p-other">
+  <div class="activity-grid">
+    <div class="act-btn" onclick="selAct(this,'tennis')" data-a="tennis"><span class="emoji">&#x1F3BE;</span>网球</div>
+    <div class="act-btn" onclick="selAct(this,'climbing')" data-a="climbing"><span class="emoji">&#x1F9D7;</span>攀岩</div>
+    <div class="act-btn" onclick="selAct(this,'custom')" data-a="custom"><span class="emoji">&#x2733;</span>其他运动</div>
+  </div>
+  <div class="input-group" id="customNameGroup" style="display:none">
+    <label>运动名称</label>
+    <div class="input-row"><input type="text" id="customName" placeholder="例如：瑜伽、拳击、滑雪..."></div>
+  </div>
+  <div class="input-group">
+    <label>时长 &amp; 卡路里</label>
+    <div class="input-row">
+      <input type="number" id="otherDur" placeholder="分钟" inputmode="numeric">
+      <input type="number" id="otherCal" placeholder="kcal" inputmode="numeric">
+    </div>
+  </div>
+  <div class="input-group">
+    <label>备注</label>
+    <div class="input-row"><input type="text" id="otherNote" placeholder="备注（选填）"></div>
+  </div>
+  <button class="btn-save other" onclick="saveEntry('other')">&#x2705; 记录</button>
+</div>
+
+<!-- Daily Notes -->
+<div class="daily-notes">
+  <div class="notes-box">
+    <label>&#x1F4DD; 今日笔记</label>
+    <textarea id="dailyNotes" placeholder="写点什么... 今天感觉怎么样？" oninput="saveDailyNotes()"></textarea>
+  </div>
+</div>
+
+<!-- Daily Calories -->
+<div class="daily-kcal" id="dailyKcalBar" style="display:none">
+  <span class="kcal-lbl">&#x1F525; 今日总消耗</span>
+  <span class="kcal-num" id="dailyKcalNum">0 kcal</span>
+</div>
+
+<!-- Today's Log -->
+<div class="log-section">
+  <h2>&#x1F4CB; 当日记录</h2>
+  <div id="logList"></div>
+</div>
+
+<!-- Calendar -->
+<div class="cal-section">
+  <div class="cal-header">
+    <button onclick="changeMonth(-1)">&lsaquo;</button>
+    <h2 id="calTitle"></h2>
+    <button onclick="changeMonth(1)">&rsaquo;</button>
+  </div>
+  <div class="cal-grid" id="calGrid"></div>
+</div>
+
+<script>
+const LABELS = {
+  stair:'爬楼机',elliptical:'椅圆机',swim:'游泳',incline:'爬坡走',dance:'跳舞',
+  shoulders:'肩',glutes:'臀',back:'背',tennis:'网球',climbing:'攀岩',custom:'其他运动'
+};
+const DB_KEY = 'gym_log_v1';
+const NOTES_KEY = 'gym_notes_v1';
+const WEIGHT_KEY = 'gym_weight_v1';
+
+let currentDate = new Date();
+let calMonth = new Date();
+let selectedAct = {};
+let weightChart = null;
+
+// ── Storage helpers ──────────────────────────────
+function loadAll()   { return JSON.parse(localStorage.getItem(DB_KEY) || '{}'); }
+function saveAll(d)  { localStorage.setItem(DB_KEY, JSON.stringify(d)); }
+function dateKey(d)  { return d.toISOString().slice(0,10); }
+function getDay(d)   { return loadAll()[dateKey(d)] || []; }
+function setDay(d,l) { const a=loadAll(); a[dateKey(d)]=l; saveAll(a); }
+
+function loadNotes() { return JSON.parse(localStorage.getItem(NOTES_KEY) || '{}'); }
+function getDayNote(d) { return loadNotes()[dateKey(d)] || ''; }
+function saveDailyNotes() {
+  const n=loadNotes(); n[dateKey(currentDate)]=document.getElementById('dailyNotes').value;
+  localStorage.setItem(NOTES_KEY, JSON.stringify(n));
+}
+
+function loadWeights() { return JSON.parse(localStorage.getItem(WEIGHT_KEY) || '{}'); }
+function saveWeight() {
+  const v = parseFloat(document.getElementById('dailyWeight').value);
+  const w = loadWeights();
+  if (v && v > 0) { w[dateKey(currentDate)] = v; } else { delete w[dateKey(currentDate)]; }
+  localStorage.setItem(WEIGHT_KEY, JSON.stringify(w));
+  if (document.getElementById('chartContainer').style.display !== 'none') renderChart();
+}
+
+// ── Date navigation ──────────────────────────────
+function changeDate(delta) { currentDate.setDate(currentDate.getDate()+delta); render(); }
+function formatDate(d) {
+  const today=new Date(), dd=dateKey(d), td=dateKey(today);
+  const m=d.getMonth()+1, day=d.getDate();
+  const wd=['日','一','二','三','四','五','六'];
+  const pfx = dd===td ? '今天' : dd===dateKey(new Date(today.getTime()-864e5)) ? '昨天' : '';
+  return pfx ? `${pfx} ${m}/${day}` : `${m}/${day} 周${wd[d.getDay()]}`;
+}
+
+// ── Tabs & activity selection ────────────────────
+function switchTab(t) {
+  document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.t===t));
+  document.querySelectorAll('.panel').forEach(el => el.classList.toggle('active', el.id==='p-'+t));
+}
+function selAct(el, act) {
+  const panel=el.closest('.panel');
+  panel.querySelectorAll('.act-btn').forEach(b => b.classList.remove('sel'));
+  el.classList.add('sel');
+  selectedAct[panel.id.replace('p-','')]=act;
+  const cg=document.getElementById('customNameGroup');
+  if(cg) cg.style.display=(act==='custom')?'block':'none';
+}
+
+// ── Unified save ─────────────────────────────────
+function saveEntry(type) {
+  const actKey = type==='weights' ? 'bodyPart' : 'activity';
+  const act = selectedAct[type];
+  if (!act) return alert(type==='weights'?'请选择训练部位':'请选择活动类型');
+
+  let customLabel = '';
+  if (act==='custom') {
+    customLabel = document.getElementById('customName').value.trim();
+    if (!customLabel) return alert('请输入运动名称');
+  }
+
+  const prefix = type==='cardio' ? 'cardio' : type==='weights' ? 'weights' : 'other';
+  const dur = parseInt(document.getElementById(prefix+'Dur').value) || 0;
+  const cal = parseInt(document.getElementById(prefix+'Cal').value) || 0;
+  const note = document.getElementById(prefix+'Note').value.trim();
+
+  const entry = { type, duration:dur, calories:cal, note, time:new Date().toTimeString().slice(0,5) };
+  entry[actKey] = act;
+  if (customLabel) entry.customLabel = customLabel;
+
+  const logs = getDay(currentDate);
+  logs.push(entry);
+  setDay(currentDate, logs);
+
+  // Clear inputs
+  document.getElementById(prefix+'Dur').value = '';
+  document.getElementById(prefix+'Cal').value = '';
+  document.getElementById(prefix+'Note').value = '';
+  if (act==='custom') document.getElementById('customName').value = '';
+  render();
+}
+
+function deleteLog(i) { const l=getDay(currentDate); l.splice(i,1); setDay(currentDate,l); render(); }
+
+// ── Render log cards ─────────────────────────────
+function renderLog() {
+  const logs=getDay(currentDate), el=document.getElementById('logList');
+  if (!logs.length) {
+    el.innerHTML='<div class="empty-state"><div class="big">&#x1F3CB;&#xFE0F;</div>今天还没有运动记录<br>选择上方类别开始记录吧！</div>';
+    return;
+  }
+  el.innerHTML = logs.map((l,i) => {
+    const kcal = l.calories ? `<span class="log-kcal">${l.calories} kcal</span>` : '';
+    const name = l.customLabel || LABELS[l.activity] || LABELS[l.bodyPart] || l.activity || l.bodyPart;
+    const meta = [l.duration?l.duration+'min':'', l.note].filter(Boolean).join(' \u00b7 ');
+    const badge = {cardio:'有氧',weights:'重训',other:'其他'}[l.type];
+    return `<div class="log-card">
+      <span class="type-badge ${l.type}">${badge}</span>
+      <span class="del-log" onclick="deleteLog(${i})">&times;</span>
+      <div class="detail">${name}${kcal}</div>
+      <div class="meta">${l.time?'\u23F0 '+l.time:''} ${meta?'\u00b7 '+meta:''}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Stats ────────────────────────────────────────
+function renderStats() {
+  const all=loadAll(), keys=Object.keys(all).filter(k=>all[k].length>0).sort();
+  document.getElementById('sTotal').textContent=keys.length;
+  const ym=dateKey(currentDate).slice(0,7);
+  document.getElementById('sMonth').textContent=keys.filter(k=>k.startsWith(ym)).length;
+  let streak=0, d=new Date();
+  if(!all[dateKey(d)]||!all[dateKey(d)].length) d.setDate(d.getDate()-1);
+  while(all[dateKey(d)]&&all[dateKey(d)].length){streak++;d.setDate(d.getDate()-1);}
+  document.getElementById('sStreak').textContent=streak;
+}
+
+// ── Weight chart ─────────────────────────────────
+function toggleChart() {
+  const c=document.getElementById('chartContainer');
+  if (c.style.display==='none'||!c.style.display) { c.style.display='block'; renderChart(); }
+  else { c.style.display='none'; }
+}
+function renderChart() {
+  const w=loadWeights(), entries=Object.entries(w).sort((a,b)=>a[0].localeCompare(b[0]));
+  if (!entries.length) { document.getElementById('chartContainer').innerHTML='<div class="chart-card" style="text-align:center;padding:30px;color:var(--sub)">还没有体重数据</div>'; return; }
+  // Rebuild canvas if needed
+  const card = document.querySelector('.chart-card');
+  if (card) card.innerHTML = '<canvas id="weightChart"></canvas>';
+  const ctx=document.getElementById('weightChart').getContext('2d');
+  if (weightChart) { weightChart.destroy(); weightChart=null; }
+  const labels=entries.map(e=>{ const d=e[0].slice(5); return d.replace('-','/'); });
+  const data=entries.map(e=>e[1]);
+  const minW=Math.floor(Math.min(...data)-1), maxW=Math.ceil(Math.max(...data)+1);
+  weightChart=new Chart(ctx,{
+    type:'line',
+    data:{ labels, datasets:[{
+      label:'体重 (kg)', data, borderColor:var_accent(), backgroundColor:var_accent()+'22',
+      fill:true, tension:0.3, pointRadius:4, pointBackgroundColor:'#fff',
+      pointBorderColor:var_accent(), pointBorderWidth:2
+    }]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{
+        y:{ min:minW, max:maxW, ticks:{callback:v=>v+'kg'} },
+        x:{ ticks:{maxTicksLimit:7, font:{size:11}} }
+      }
+    }
+  });
+}
+function var_accent(){ return getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(); }
+
+// ── Calendar ─────────────────────────────────────
+function changeMonth(delta) { calMonth.setMonth(calMonth.getMonth()+delta); renderCal(); }
+function renderCal() {
+  const all=loadAll(), y=calMonth.getFullYear(), m=calMonth.getMonth();
+  document.getElementById('calTitle').textContent=`${y}\u5E74${m+1}\u6708`;
+  const firstDay=new Date(y,m,1).getDay(), days=new Date(y,m+1,0).getDate();
+  const todayK=dateKey(new Date()), selK=dateKey(currentDate);
+  const DOT={cardio:'d-cardio',weights:'d-weights',other:'d-other'};
+  let html=['\u65E5','\u4E00','\u4E8C','\u4E09','\u56DB','\u4E94','\u516D'].map(d=>`<div class="cal-day-name">${d}</div>`).join('');
+  for(let i=0;i<firstDay;i++) html+='<div class="cal-day other-month"></div>';
+  for(let d=1;d<=days;d++){
+    const dk=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const logs=all[dk]||[];
+    let cls='cal-day';
+    if(dk===todayK) cls+=' today';
+    if(dk===selK) cls+=' selected';
+    let items='';
+    if(logs.length){
+      // Dedupe: show each unique activity once
+      const seen=new Set();
+      const rows=[];
+      for(const l of logs){
+        const name=l.customLabel||LABELS[l.activity]||LABELS[l.bodyPart]||'';
+        const key=l.type+':'+name;
+        if(seen.has(key)) continue;
+        seen.add(key);
+        rows.push(`<span class="cal-item"><span class="cal-dot ${DOT[l.type]||'d-other'}"></span>${name}</span>`);
+      }
+      // Show max 3, then +N
+      if(rows.length>3){
+        items='<div class="cal-items">'+rows.slice(0,2).join('')+`<span class="cal-item" style="color:var(--sub)">+${rows.length-2}</span></div>`;
+      } else {
+        items='<div class="cal-items">'+rows.join('')+'</div>';
+      }
+    }
+    html+=`<div class="${cls}" onclick="goToDate('${dk}')"><span class="day-num">${d}</span>${items}</div>`;
+  }
+  document.getElementById('calGrid').innerHTML=html;
+}
+function goToDate(dk){ currentDate=new Date(dk+'T12:00:00'); render(); }
+
+// ── Master render ────────────────────────────────
+function render() {
+  document.getElementById('dateLabel').textContent=formatDate(currentDate);
+  calMonth=new Date(currentDate);
+  // Weight
+  const w=loadWeights(), wv=w[dateKey(currentDate)];
+  document.getElementById('dailyWeight').value = wv || '';
+  // Notes
+  document.getElementById('dailyNotes').value=getDayNote(currentDate);
+  // Calories
+  const logs=getDay(currentDate), totalCal=logs.reduce((s,l)=>s+(l.calories||0),0);
+  const bar=document.getElementById('dailyKcalBar');
+  if(totalCal>0){bar.style.display='flex';document.getElementById('dailyKcalNum').textContent=totalCal+' kcal';}
+  else{bar.style.display='none';}
+  renderLog(); renderStats(); renderCal();
+  if(document.getElementById('chartContainer').style.display==='block') renderChart();
+}
+
+// ── Init ─────────────────────────────────────────
+render();
+</script>
+</body>
+</html>
